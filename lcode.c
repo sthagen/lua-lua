@@ -678,22 +678,22 @@ static void luaK_float (FuncState *fs, int reg, lua_Number f) {
 */
 static void const2exp (TValue *v, expdesc *e) {
   switch (ttypetag(v)) {
-    case LUA_TNUMINT:
+    case LUA_VNUMINT:
       e->k = VKINT; e->u.ival = ivalue(v);
       break;
-    case LUA_TNUMFLT:
+    case LUA_VNUMFLT:
       e->k = VKFLT; e->u.nval = fltvalue(v);
       break;
-    case LUA_TFALSE:
+    case LUA_VFALSE:
       e->k = VFALSE;
       break;
-    case LUA_TTRUE:
+    case LUA_VTRUE:
       e->k = VTRUE;
       break;
-    case LUA_TNIL:
+    case LUA_VNIL:
       e->k = VNIL;
       break;
-    case LUA_TSHRSTR:  case LUA_TLNGSTR:
+    case LUA_VSHRSTR:  case LUA_VLNGSTR:
       e->k = VKSTR; e->u.strval = tsvalue(v);
       break;
     default: lua_assert(0);
@@ -872,9 +872,9 @@ static void discharge2anyreg (FuncState *fs, expdesc *e) {
 }
 
 
-static int code_loadbool (FuncState *fs, int A, OpCode op, int jump) {
+static int code_loadbool (FuncState *fs, int A, OpCode op) {
   luaK_getlabel(fs);  /* those instructions may be jump targets */
-  return luaK_codeABC(fs, op, A, jump, 0);
+  return luaK_codeABC(fs, op, A, 0, 0);
 }
 
 
@@ -908,8 +908,8 @@ static void exp2reg (FuncState *fs, expdesc *e, int reg) {
     int p_t = NO_JUMP;  /* position of an eventual LOAD true */
     if (need_value(fs, e->t) || need_value(fs, e->f)) {
       int fj = (e->k == VJMP) ? NO_JUMP : luaK_jump(fs);
-      p_f = code_loadbool(fs, reg, OP_LOADFALSE, 1);  /* skip next inst. */
-      p_t = code_loadbool(fs, reg, OP_LOADTRUE, 0);
+      p_f = code_loadbool(fs, reg, OP_LFALSESKIP);  /* skip next inst. */
+      p_t = code_loadbool(fs, reg, OP_LOADTRUE);
       /* jump around these booleans if 'e' is not a test */
       luaK_patchtohere(fs, fj);
     }
