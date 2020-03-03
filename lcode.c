@@ -703,19 +703,18 @@ static void const2exp (TValue *v, expdesc *e) {
 
 /*
 ** Fix an expression to return the number of results 'nresults'.
-** Either 'e' is a multi-ret expression (function call or vararg)
-** or 'nresults' is LUA_MULTRET (as any expression can satisfy that).
+** 'e' must be a multi-ret expression (function call or vararg).
 */
 void luaK_setreturns (FuncState *fs, expdesc *e, int nresults) {
   Instruction *pc = &getinstruction(fs, e);
   if (e->k == VCALL)  /* expression is an open function call? */
     SETARG_C(*pc, nresults + 1);
-  else if (e->k == VVARARG) {
+  else {
+    lua_assert(e->k == VVARARG);
     SETARG_C(*pc, nresults + 1);
     SETARG_A(*pc, fs->freereg);
     luaK_reserveregs(fs, 1);
   }
-  else lua_assert(nresults == LUA_MULTRET);
 }
 
 
@@ -1730,17 +1729,12 @@ void luaK_fixline (FuncState *fs, int line) {
 }
 
 
-void luaK_settablesize (FuncState *fs, int pc, int ra, int rc, int rb) {
+void luaK_settablesize (FuncState *fs, int pc, int ra, int asize, int hsize) {
   Instruction *inst = &fs->f->code[pc];
-  int extra = 0;
-  int k = 0;
-  if (rb != 0)
-    rb = luaO_ceillog2(rb) + 1;  /* hash size */
-  if (rc > MAXARG_C) {  /* does it need the extra argument? */
-    extra = rc / (MAXARG_C + 1);
-    rc %= (MAXARG_C + 1);
-    k = 1;
-  }
+  int rb = (hsize != 0) ? luaO_ceillog2(hsize) + 1 : 0;  /* hash size */
+  int extra = asize / (MAXARG_C + 1);  /* higher bits of array size */
+  int rc = asize % (MAXARG_C + 1);  /* lower bits of array size */
+  int k = (extra > 0);  /* true iff needs extra argument */
   *inst = CREATE_ABCk(OP_NEWTABLE, ra, rb, rc, k);
   *(inst + 1) = CREATE_Ax(OP_EXTRAARG, extra);
 }
