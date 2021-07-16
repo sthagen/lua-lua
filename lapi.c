@@ -53,6 +53,10 @@ const char lua_ident[] =
 #define isupvalue(i)		((i) < LUA_REGISTRYINDEX)
 
 
+/*
+** Convert an acceptable index to a pointer to its respective value.
+** Non-valid indices return the special nil value 'G(L)->nilvalue'.
+*/
 static TValue *index2value (lua_State *L, int idx) {
   CallInfo *ci = L->ci;
   if (idx > 0) {
@@ -70,22 +74,26 @@ static TValue *index2value (lua_State *L, int idx) {
   else {  /* upvalues */
     idx = LUA_REGISTRYINDEX - idx;
     api_check(L, idx <= MAXUPVAL + 1, "upvalue index too large");
-    if (ttislcf(s2v(ci->func)))  /* light C function? */
-      return &G(L)->nilvalue;  /* it has no upvalues */
-    else {
+    if (ttisCclosure(s2v(ci->func))) {  /* C closure? */
       CClosure *func = clCvalue(s2v(ci->func));
       return (idx <= func->nupvalues) ? &func->upvalue[idx-1]
                                       : &G(L)->nilvalue;
     }
+    else {  /* light C function or Lua function (through a hook)?) */
+      api_check(L, ttislcf(s2v(ci->func)), "caller not a C function");
+      return &G(L)->nilvalue;  /* no upvalues */
+    }
   }
 }
 
-
+/*
+** Convert a valid actual index (not a pseudo-index) to its address.
+*/
 static StkId index2stack (lua_State *L, int idx) {
   CallInfo *ci = L->ci;
   if (idx > 0) {
     StkId o = ci->func + idx;
-    api_check(L, o < L->top, "unacceptable index");
+    api_check(L, o < L->top, "invalid index");
     return o;
   }
   else {    /* non-positive index */
@@ -173,7 +181,7 @@ LUA_API int lua_gettop (lua_State *L) {
 
 LUA_API void lua_settop (lua_State *L, int idx) {
   CallInfo *ci;
-  StkId func;
+  StkId func, newtop;
   ptrdiff_t diff;  /* difference for new top */
   lua_lock(L);
   ci = L->ci;
@@ -188,12 +196,13 @@ LUA_API void lua_settop (lua_State *L, int idx) {
     api_check(L, -(idx+1) <= (L->top - (func + 1)), "invalid new top");
     diff = idx + 1;  /* will "subtract" index (as it is negative) */
   }
-#if defined(LUA_COMPAT_5_4_0)
-  if (diff < 0 && hastocloseCfunc(ci->nresults))
-    luaF_close(L, L->top + diff, CLOSEKTOP, 0);
-#endif
-  api_check(L, L->tbclist < L->top + diff, "cannot pop an unclosed slot");
-  L->top += diff;
+  api_check(L, L->tbclist < L->top, "previous pop of an unclosed slot");
+  newtop = L->top + diff;
+  if (diff < 0 && L->tbclist >= newtop) {
+    lua_assert(hastocloseCfunc(ci->nresults));
+    luaF_close(L, newtop, CLOSEKTOP, 0);
+  }
+  L->top = newtop;  /* correct top only after closing any upvalue */
   lua_unlock(L);
 }
 

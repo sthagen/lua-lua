@@ -165,7 +165,7 @@ typedef struct stringtable {
 ** - field 'nyield' is used only while a function is "doing" an
 ** yield (from the yield until the next resume);
 ** - field 'nres' is used only while closing tbc variables when
-** returning from a C function;
+** returning from a function;
 ** - field 'transferinfo' is used only during call/returnhooks,
 ** before the function starts or after it ends.
 */
@@ -260,6 +260,7 @@ typedef struct global_State {
   lu_byte currentwhite;
   lu_byte gcstate;  /* state of garbage collector */
   lu_byte gckind;  /* kind of GC running */
+  lu_byte gcstopem;  /* stops emergency collections */
   lu_byte genminormul;  /* control for minor generational collections */
   lu_byte genmajormul;  /* control for major generational collections */
   lu_byte gcrunning;  /* true if GC is running */

@@ -172,7 +172,7 @@ void luaE_checkcstack (lua_State *L) {
 
 LUAI_FUNC void luaE_incCstack (lua_State *L) {
   L->nCcalls++;
-  if (unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
+  if (l_unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
     luaE_checkcstack(L);
 }
 
@@ -269,7 +269,7 @@ static void preinit_thread (lua_State *L, global_State *g) {
 static void close_state (lua_State *L) {
   global_State *g = G(L);
   if (!completestate(g))  /* closing a partially built state? */
-    luaC_freeallobjects(L);  /* jucst collect its objects */
+    luaC_freeallobjects(L);  /* just collect its objects */
   else {  /* closing a fully built state */
     luaD_closeprotected(L, 1, LUA_OK);  /* close all upvalues */
     luaC_freeallobjects(L);  /* collect all objects */
@@ -379,6 +379,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->panic = NULL;
   g->gcstate = GCSpause;
   g->gckind = KGC_INC;
+  g->gcstopem = 0;
   g->gcemergency = 0;
   g->finobj = g->tobefnz = g->fixedgc = NULL;
   g->firstold1 = g->survival = g->old1 = g->reallyold = NULL;

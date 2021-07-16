@@ -128,7 +128,7 @@ static void checknext (LexState *ls, int c) {
 ** in line 'where' (if that is not the current line).
 */
 static void check_match (LexState *ls, int what, int who, int where) {
-  if (unlikely(!testnext(ls, what))) {
+  if (l_unlikely(!testnext(ls, what))) {
     if (where == ls->linenumber)  /* all in the same line? */
       error_expected(ls, what);  /* do not need a complex message */
     else {
@@ -417,6 +417,17 @@ static void markupval (FuncState *fs, int level) {
 
 
 /*
+** Mark that current block has a to-be-closed variable.
+*/
+static void marktobeclosed (FuncState *fs) {
+  BlockCnt *bl = fs->bl;
+  bl->upval = 1;
+  bl->insidetbc = 1;
+  fs->needclose = 1;
+}
+
+
+/*
 ** Find a variable with the given name 'n'. If it is an upvalue, add
 ** this upvalue into all intermediate functions. If it is a global, set
 ** 'var' as 'void' as a flag.
@@ -517,7 +528,7 @@ static void solvegoto (LexState *ls, int g, Labeldesc *label) {
   Labellist *gl = &ls->dyd->gt;  /* list of goto's */
   Labeldesc *gt = &gl->arr[g];  /* goto to be resolved */
   lua_assert(eqstr(gt->name, label->name));
-  if (unlikely(gt->nactvar < label->nactvar))  /* enter some scope? */
+  if (l_unlikely(gt->nactvar < label->nactvar))  /* enter some scope? */
     jumpscopeerror(ls, gt);
   luaK_patchlist(ls->fs, gt->pc, label->pc);
   for (i = g; i < gl->n - 1; i++)  /* remove goto from pending list */
@@ -1435,7 +1446,7 @@ static void breakstat (LexState *ls) {
 */
 static void checkrepeated (LexState *ls, TString *name) {
   Labeldesc *lb = findlabel(ls, name);
-  if (unlikely(lb != NULL)) {  /* already defined? */
+  if (l_unlikely(lb != NULL)) {  /* already defined? */
     const char *msg = "label '%s' already defined on line %d";
     msg = luaO_pushfstring(ls->L, msg, getstr(name), lb->line);
     luaK_semerror(ls, msg);  /* error */
@@ -1520,7 +1531,7 @@ static void fixforjump (FuncState *fs, int pc, int dest, int back) {
   int offset = dest - (pc + 1);
   if (back)
     offset = -offset;
-  if (unlikely(offset > MAXARG_Bx))
+  if (l_unlikely(offset > MAXARG_Bx))
     luaX_syntaxerror(fs->ls, "control structure too long");
   SETARG_Bx(*jmp, offset);
 }
@@ -1599,7 +1610,7 @@ static void forlist (LexState *ls, TString *indexname) {
   line = ls->linenumber;
   adjust_assign(ls, 4, explist(ls, &e), &e);
   adjustlocalvars(ls, 4);  /* control variables */
-  markupval(fs, fs->nactvar);  /* last control var. must be closed */
+  marktobeclosed(fs);  /* last control var. must be closed */
   luaK_checkstack(fs, 3);  /* extra space to call generator */
   forbody(ls, base, line, nvars - 4, 1);
 }
@@ -1703,11 +1714,9 @@ static int getlocalattribute (LexState *ls) {
 }
 
 
-static void checktoclose (LexState *ls, int level) {
+static void checktoclose (FuncState *fs, int level) {
   if (level != -1) {  /* is there a to-be-closed variable? */
-    FuncState *fs = ls->fs;
-    markupval(fs, level + 1);
-    fs->bl->insidetbc = 1;  /* in the scope of a to-be-closed variable */
+    marktobeclosed(fs);
     luaK_codeABC(fs, OP_TBC, reglevel(fs, level), 0, 0);
   }
 }
@@ -1751,7 +1760,7 @@ static void localstat (LexState *ls) {
     adjust_assign(ls, nvars, nexps, &e);
     adjustlocalvars(ls, nvars);
   }
-  checktoclose(ls, toclose);
+  checktoclose(fs, toclose);
 }
 
 
@@ -1776,6 +1785,7 @@ static void funcstat (LexState *ls, int line) {
   luaX_next(ls);  /* skip FUNCTION */
   ismethod = funcname(ls, &v);
   body(ls, &b, ismethod, line);
+  check_readonly(ls, &v);
   luaK_storevar(ls->fs, &v, &b);
   luaK_fixline(ls->fs, line);  /* definition "happens" in the first line */
 }
