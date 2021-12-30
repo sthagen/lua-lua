@@ -225,7 +225,7 @@ do   -- testing active lines
     -- 5th line is empty
   end, {3, 4, 6})
 
-  checkactivelines(function (...) end, {0})
+  checkactivelines(function (a, b, ...) end, {0})
 
   checkactivelines(function (a, b)
   end, {1})
@@ -887,7 +887,7 @@ do   -- testing debug info for finalizers
 
   -- create a piece of garbage with a finalizer
   setmetatable({}, {__gc = function ()
-    local t = debug.getinfo(2)   -- get callee information
+    local t = debug.getinfo(1)   -- get function information
     assert(t.namewhat == "metamethod")
     name = t.name
   end})
