@@ -2521,7 +2521,7 @@ In general,
 Lua's garbage collection can free or move internal memory
 and then invalidate pointers to internal strings.
 To allow a safe use of these pointers,
-The API guarantees that any pointer to a string in a stack index
+the API guarantees that any pointer to a string in a stack index
 is valid while the string value at that index is not removed from the stack.
 (It can be moved to another index, though.)
 When the index is a pseudo-index (referring to an upvalue),
@@ -3981,6 +3981,7 @@ Also @N{returns 0} if any of the indices are not valid.
 
 Similar to @Lid{lua_gettable}, but does a raw access
 (i.e., without metamethods).
+The value at @id{index} must be a table.
 
 }
 
@@ -4027,6 +4028,7 @@ For other values, this call @N{returns 0}.
 
 Similar to @Lid{lua_settable}, but does a raw assignment
 (i.e., without metamethods).
+The value at @id{index} must be a table.
 
 }
 
@@ -5347,7 +5349,7 @@ Equivalent to the sequence
 @APIEntry{void luaL_buffsub (luaL_Buffer *B, int n);|
 @apii{?,?,-}
 
-Removes @id{n} bytes from the the buffer @id{B}
+Removes @id{n} bytes from the buffer @id{B}
 @seeC{luaL_Buffer}.
 The buffer must have at least that many bytes.
 
@@ -7280,7 +7282,7 @@ according to the format string @id{fmt} @see{pack}.
 
 @LibEntry{string.packsize (fmt)|
 
-Returns the size of a string resulting from @Lid{string.pack}
+Returns the length of a string resulting from @Lid{string.pack}
 with the given format.
 The format string cannot have the variable-length options
 @Char{s} or @Char{z} @see{pack}.
