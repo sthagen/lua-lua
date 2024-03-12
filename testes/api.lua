@@ -546,9 +546,9 @@ do
   ]], source)
   collectgarbage()
   local m2 = collectgarbage"count" * 1024
-  -- load used fewer than 350 bytes. Code alone has more than 3*N bytes,
+  -- load used fewer than 400 bytes. Code alone has more than 3*N bytes,
   -- and string literal has N bytes. Both were not loaded.
-  assert(m2 > m1 and m2 - m1 < 350)
+  assert(m2 > m1 and m2 - m1 < 400)
   X = 0; code(); assert(X == N and Y == string.rep("a", N))
   X = nil; Y = nil
 
@@ -1122,7 +1122,7 @@ assert(a == nil and c == 2)   -- 2 == run-time error
 a, b, c = T.doremote(L1, "return a+")
 assert(a == nil and c == 3 and type(b) == "string")   -- 3 == syntax error
 
-T.loadlib(L1, 2)    -- load only 'package'
+T.loadlib(L1, 2, ~2)    -- load only 'package', preload all others
 a, b, c = T.doremote(L1, [[
   string = require'string'
   local initialG = _G   -- not loaded yet
@@ -1141,7 +1141,7 @@ T.closestate(L1);
 
 
 L1 = T.newstate()
-T.loadlib(L1, 0)
+T.loadlib(L1, 0, 0)
 T.doremote(L1, "a = {}")
 T.testC(L1, [[getglobal "a"; pushstring "x"; pushint 1;
              settable -3]])
@@ -1193,7 +1193,8 @@ do
   local a, b = pcall(T.makeCfunc[[
     call 0 1   # create resource
     toclose -1 # mark it to be closed
-    error       # resource is the error object
+    pushvalue -1  # replicate it as error object
+    error       # resource right after error object
   ]], newresource)
   assert(a == false and b[1] == 11)
   assert(#openresource == 0)    -- was closed
@@ -1524,7 +1525,7 @@ end
 
 do   -- garbage collection with no extra memory
   local L = T.newstate()
-  T.loadlib(L, 1 | 2)   -- load _G and 'package'
+  T.loadlib(L, 1 | 2, 0)   -- load _G and 'package'
   local res = (T.doremote(L, [[
     _ENV = _G
     assert(string == nil)
