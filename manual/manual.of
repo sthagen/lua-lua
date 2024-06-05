@@ -7308,9 +7308,12 @@ Returns a formatted version of its variable number of arguments
 following the description given in its first argument,
 which must be a string.
 The format string follows the same rules as the @ANSI{sprintf}.
-The only differences are that the conversion specifiers and modifiers
-@id{F}, @id{n}, @T{*}, @id{h}, @id{L}, and @id{l} are not supported
-and that there is an extra specifier, @id{q}.
+The accepted conversion specifiers are
+@id{A}, @id{a}, @id{c}, @id{d}, @id{E}, @id{e}, @id{f}, @id{G}, @id{g},
+@id{i}, @id{o}, @id{p}, @id{s}, @id{u}, @id{X}, and @id{x},
+plus a non-C specifier @id{q}.
+The accepted flags are @Char{-}, @Char{+}, @Char{#},
+@Char{0}, and @Char{ } (space).
 Both width and precision, when present,
 are limited to two digits.
 
@@ -8939,13 +8942,13 @@ The returned table can contain all the fields returned by @Lid{lua_getinfo},
 with the string @id{what} describing which fields to fill in.
 The default for @id{what} is to get all information available,
 except the table of valid lines.
-If present,
-the option @Char{f}
+The option @Char{f}
 adds a field named @id{func} with the function itself.
-If present,
-the option @Char{L}
-adds a field named @id{activelines} with the table of
-valid lines.
+The option @Char{L} adds a field named @id{activelines}
+with the table of valid lines,
+provided the function is a Lua function.
+If the function has no debug information,
+the table is empty.
 
 For instance, the expression @T{debug.getinfo(1,"n").name} returns
 a name for the current function,
