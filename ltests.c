@@ -365,7 +365,7 @@ static void checktable (global_State *g, Table *h) {
   checkobjrefN(g, hgc, h->metatable);
   for (i = 0; i < asize; i++) {
     TValue aux;
-    arr2obj(h, i + 1, &aux);
+    arr2obj(h, i, &aux);
     checkvalref(g, hgc, &aux);
   }
   for (n = gnode(h, 0); n < limit; n++) {
@@ -1010,7 +1010,7 @@ static int table_query (lua_State *L) {
   }
   else if (cast_uint(i) < asize) {
     lua_pushinteger(L, i);
-    arr2obj(t, i + 1, s2v(L->top.p));
+    arr2obj(t, i, s2v(L->top.p));
     api_incr_top(L);
     lua_pushnil(L);
   }
@@ -1732,6 +1732,11 @@ static int runC (lua_State *L, lua_State *L1, const char *pc) {
       int i = getindex;
       int nres;
       status = lua_resume(lua_tothread(L1, i), L, getnum, &nres);
+    }
+    else if EQ("traceback") {
+      const char *msg = getstring;
+      int level = getnum;
+      luaL_traceback(L1, L1, msg, level);
     }
     else if EQ("return") {
       int n = getnum;
