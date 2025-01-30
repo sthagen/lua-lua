@@ -343,13 +343,19 @@ void lua_printvalue (TValue *v) {
       printf("%s", (!l_isfalse(v) ? "true" : "false"));
       break;
     }
+    case LUA_TLIGHTUSERDATA: {
+      printf("light udata: %p", pvalue(v));
+      break;
+    }
     case LUA_TNIL: {
       printf("nil");
       break;
     }
     default: {
-      void *p = iscollectable(v) ? gcvalue(v) : NULL;
-      printf("%s: %p", ttypename(ttype(v)), p);
+      if (ttislcf(v))
+        printf("light C function: %p", fvalue(v));
+      else  /* must be collectable */
+        printf("%s: %p", ttypename(ttype(v)), gcvalue(v));
       break;
     }
   }
@@ -809,7 +815,7 @@ static int listk (lua_State *L) {
   luaL_argcheck(L, lua_isfunction(L, 1) && !lua_iscfunction(L, 1),
                  1, "Lua function expected");
   p = getproto(obj_at(L, 1));
-  lua_createtable(L, cast_uint(p->sizek), 0);
+  lua_createtable(L, p->sizek, 0);
   for (i=0; i<p->sizek; i++) {
     pushobject(L, p->k+i);
     lua_rawseti(L, -2, i+1);
@@ -825,7 +831,7 @@ static int listabslineinfo (lua_State *L) {
                  1, "Lua function expected");
   p = getproto(obj_at(L, 1));
   luaL_argcheck(L, p->abslineinfo != NULL, 1, "function has no debug info");
-  lua_createtable(L, 2u * cast_uint(p->sizeabslineinfo), 0);
+  lua_createtable(L, 2 * p->sizeabslineinfo, 0);
   for (i=0; i < p->sizeabslineinfo; i++) {
     lua_pushinteger(L, p->abslineinfo[i].pc);
     lua_rawseti(L, -2, 2 * i + 1);
@@ -867,7 +873,7 @@ void lua_printstack (lua_State *L) {
 
 
 static int get_limits (lua_State *L) {
-  lua_createtable(L, 0, 6);
+  lua_createtable(L, 0, 5);
   setnameval(L, "IS32INT", LUAI_IS32INT);
   setnameval(L, "MAXARG_Ax", MAXARG_Ax);
   setnameval(L, "MAXARG_Bx", MAXARG_Bx);
@@ -1367,7 +1373,7 @@ static int checkpanic (lua_State *L) {
   b.L = L;
   L1 = lua_newstate(f, ud, 0);  /* create new state */
   if (L1 == NULL) {  /* error? */
-    lua_pushnil(L);
+    lua_pushstring(L, MEMERRMSG);
     return 1;
   }
   lua_atpanic(L1, panicback);  /* set its panic function */
@@ -1389,7 +1395,7 @@ static int checkpanic (lua_State *L) {
 static int externKstr (lua_State *L) {
   size_t len;
   const char *s = luaL_checklstring(L, 1, &len);
-  lua_pushextlstring(L, s, len, NULL, NULL);
+  lua_pushexternalstring(L, s, len, NULL, NULL);
   return 1;
 }
 
@@ -1413,7 +1419,7 @@ static int externstr (lua_State *L) {
   /* copy string content to buffer, including ending 0 */
   memcpy(buff, s, (len + 1) * sizeof(char));
   /* create external string */
-  lua_pushextlstring(L, buff, len, allocf, ud);
+  lua_pushexternalstring(L, buff, len, allocf, ud);
   return 1;
 }
 
@@ -1499,15 +1505,20 @@ static int getindex_aux (lua_State *L, lua_State *L1, const char **pc) {
   skip(pc);
   switch (*(*pc)++) {
     case 'R': return LUA_REGISTRYINDEX;
-    case 'G': return luaL_error(L, "deprecated index 'G'");
     case 'U': return lua_upvalueindex(getnum_aux(L, L1, pc));
-    default: (*pc)--; return getnum_aux(L, L1, pc);
+    default: {
+      int n;
+      (*pc)--;  /* to read again */
+      n = getnum_aux(L, L1, pc);
+      if (n == 0) return 0;
+      else return lua_absindex(L1, n);
+    }
   }
 }
 
 
 static const char *const statcodes[] = {"OK", "YIELD", "ERRRUN",
-    "ERRSYNTAX", MEMERRMSG, "ERRGCMM", "ERRERR"};
+    "ERRSYNTAX", MEMERRMSG, "ERRERR"};
 
 /*
 ** Avoid these stat codes from being collected, to avoid possible
@@ -1550,7 +1561,7 @@ static int runC (lua_State *L, lua_State *L1, const char *pc) {
     const char *inst = getstring;
     if EQ("") return 0;
     else if EQ("absindex") {
-      lua_pushinteger(L1, lua_absindex(L1, getindex));
+      lua_pushinteger(L1, getindex);
     }
     else if EQ("append") {
       int t = getindex;
@@ -1805,6 +1816,12 @@ static int runC (lua_State *L, lua_State *L1, const char *pc) {
       const char *msg = getstring;
       int level = getnum;
       luaL_traceback(L1, L1, msg, level);
+    }
+    else if EQ("threadstatus") {
+      lua_pushstring(L1, statcodes[lua_status(L1)]);
+    }
+    else if EQ("alloccount") {
+      l_memcontrol.countlimit = cast_uint(getnum);
     }
     else if EQ("return") {
       int n = getnum;
