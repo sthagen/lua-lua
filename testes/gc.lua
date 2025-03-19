@@ -1,5 +1,5 @@
 -- $Id: testes/gc.lua $
--- See Copyright Notice in file all.lua
+-- See Copyright Notice in file lua.h
 
 print('testing incremental garbage collection')
 
@@ -596,6 +596,21 @@ if T then
   debug.setmetatable(x, {__gc = nop})   -- ...the old one
   assert(T.gccolor(y) == "white")
   T.checkmemory()
+  collectgarbage("restart")
+end
+
+
+if T then
+  collectgarbage("stop")
+  T.gcstate("pause")
+  local sup = {x = 0}
+  local a = setmetatable({}, {__newindex = sup})
+  T.gcstate("enteratomic")
+  assert(T.gccolor(sup) == "black")
+  a.x = {}   -- should not break the invariant
+  assert(not (T.gccolor(sup) == "black" and T.gccolor(sup.x) == "white"))
+  T.gcstate("pause")  -- complete the GC cycle
+  sup.x.y = 10
   collectgarbage("restart")
 end
 

@@ -1,5 +1,5 @@
 -- $Id: testes/errors.lua $
--- See Copyright Notice in file all.lua
+-- See Copyright Notice in file lua.h
 
 print("testing errors")
 
@@ -46,7 +46,7 @@ end
 assert(doit("error('hi', 0)") == 'hi')
 
 -- test nil error message
-assert(doit("error()") == "<error object is nil>")
+assert(doit("error()") == "<no error object>")
 
 
 -- test common errors/errors that crashed in the past
@@ -161,6 +161,9 @@ checkmessage("aaa=(1)..{}", "a table value")
 
 -- bug in 5.4.6
 checkmessage("a = {_ENV = {}}; print(a._ENV.x + 1)", "field 'x'")
+
+-- a similar bug, since 5.4.0
+checkmessage("print(('_ENV').x + 1)", "field 'x'")
 
 _G.aaa, _G.bbbb = nil
 
@@ -614,7 +617,7 @@ do
   assert(not res and msg == t)
 
   res, msg = pcall(function () error(nil) end)
-  assert(not res and msg == "<error object is nil>")
+  assert(not res and msg == "<no error object>")
 
   local function f() error{msg='x'} end
   res, msg = xpcall(f, function (r) return {msg=r.msg..'y'} end)

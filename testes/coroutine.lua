@@ -1,5 +1,5 @@
 -- $Id: testes/coroutine.lua $
--- See Copyright Notice in file all.lua
+-- See Copyright Notice in file lua.h
 
 print "testing coroutines"
 
@@ -504,6 +504,25 @@ a = function(a) coroutine.wrap(a)(a) end
 assert(not pcall(a, a))
 a = nil
 
+
+do
+  -- bug in 5.4: thread can use message handler higher in the stack
+  -- than the variable being closed
+  local c = coroutine.create(function()
+    local clo <close> = setmetatable({}, {__close=function()
+      local x = 134   -- will overwrite message handler
+      error(x)
+    end})
+    -- yields coroutine but leaves a new message handler for it,
+    -- that would be used when closing the coroutine (except that it
+    -- will be overwritten)
+    xpcall(coroutine.yield, function() return "XXX" end)
+  end)
+
+  assert(coroutine.resume(c))   -- start coroutine
+  local st, msg = coroutine.close(c)
+  assert(not st and msg == 134)
+end
 
 -- access to locals of erroneous coroutines
 local x = coroutine.create (function ()

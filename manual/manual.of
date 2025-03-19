@@ -2222,10 +2222,10 @@ f(3, 4, 5)       a=3, b=4
 f(r(), 10)       a=1, b=10
 f(r())           a=1, b=2
 
-g(3)             a=3, b=nil, ... -->  (nothing)
-g(3, 4)          a=3, b=4,   ... -->  (nothing)
-g(3, 4, 5, 8)    a=3, b=4,   ... -->  5  8
-g(5, r())        a=5, b=1,   ... -->  2  3
+g(3)             a=3, b=nil, ... ->  (nothing)
+g(3, 4)          a=3, b=4,   ... ->  (nothing)
+g(3, 4, 5, 8)    a=3, b=4,   ... ->  5  8
+g(5, r())        a=5, b=1,   ... ->  2  3
 }
 
 Results are returned using the @Rw{return} statement @see{control}.
@@ -6230,14 +6230,16 @@ Returns the name of the type of the value at the given index.
 @APIEntry{void luaL_unref (lua_State *L, int t, int ref);|
 @apii{0,0,-}
 
-Releases the reference @id{ref} from the table at index @id{t}
-@seeC{luaL_ref}.
-The entry is removed from the table,
+Releases a reference @see{luaL_ref}.
+The integer @id{ref} must be either
+@Lid{LUA_NOREF}, @Lid{LUA_REFNIL},
+or a reference previously returned by @Lid{luaL_ref}
+and not already released.
+If @id{ref} is either @Lid{LUA_NOREF} or @Lid{LUA_REFNIL}
+this function does nothing.
+Otherwise, the entry is removed from the table,
 so that the referred object can be collected and
 the reference @id{ref} can be used again by @Lid{luaL_ref}.
-
-If @id{ref} is @Lid{LUA_NOREF} or @Lid{LUA_REFNIL},
-@Lid{luaL_unref} does nothing.
 
 }
 
@@ -7477,25 +7479,25 @@ then there is no replacement
 Here are some examples:
 @verbatim{
 x = string.gsub("hello world", "(%w+)", "%1 %1")
---> x="hello hello world world"
+-- x="hello hello world world"
 
 x = string.gsub("hello world", "%w+", "%0 %0", 1)
---> x="hello hello world"
+-- x="hello hello world"
 
 x = string.gsub("hello world from Lua", "(%w+)%s*(%w+)", "%2 %1")
---> x="world hello Lua from"
+-- x="world hello Lua from"
 
 x = string.gsub("home = $HOME, user = $USER", "%$(%w+)", os.getenv)
---> x="home = /home/roberto, user = roberto"
+-- x="home = /home/roberto, user = roberto"
 
 x = string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function (s)
       return load(s)()
     end)
---> x="4+5 = 9"
+-- x="4+5 = 9"
 
 local t = {name="lua", version="5.4"}
 x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
---> x="lua-5.4.tar.gz"
+-- x="lua-5.4.tar.gz"
 }
 
 }
@@ -9299,15 +9301,21 @@ the interpreter waits for its completion
 by issuing a different prompt.
 
 Note that, as each complete line is read as a new chunk,
-local variables do not outlive lines:
+local variables do not outlive lines.
+To steer clear of confusion,
+the interpreter gives a warning if a line starts with the
+reserved word @Rw{local}:
 @verbatim{
-> x = 20
-> local x = 10; print(x)   --> 10
-> print(x)                 --> 20    -- global 'x'
-> do       -- incomplete line
+> x = 20      -- global 'x'
+> local x = 10; print(x)
+    --> warning: locals do not survive across lines in interactive mode
+    --> 10
+> print(x)     -- back to global 'x'
+    --> 20
+> do       -- incomplete chunk
 >> local x = 10; print(x)    -- '>>' prompts for line completion
 >> print(x)
->> end     -- line completed; Lua will run it as a single chunk
+>> end     -- chunk completed
    --> 10
    --> 10
 }
