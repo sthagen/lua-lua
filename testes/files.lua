@@ -347,7 +347,7 @@ collectgarbage()
 
 assert(io.write(' ' .. t .. ' '))
 assert(io.write(';', 'end of file\n'))
-f:flush(); io.flush()
+assert(f:flush()); assert(io.flush())
 f:close()
 print('+')
 
@@ -458,6 +458,23 @@ do   -- testing closing file in line iteration
   local st, msg = pcall(foo, file)
   assert(st == false and io.type(msg) == "closed file")
 
+end
+
+
+do print("testing flush")
+  local f = io.output("/dev/null")
+  assert(f:write("abcd"))   -- write to buffer
+  assert(f:flush())         -- write to device
+  assert(f:write("abcd"))   -- write to buffer
+  assert(io.flush())        -- write to device
+  assert(f:close())
+
+  local f = io.output("/dev/full")
+  assert(f:write("abcd"))   -- write to buffer
+  assert(not f:flush())     -- cannot write to device
+  assert(f:write("abcd"))   -- write to buffer
+  assert(not io.flush())    -- cannot write to device
+  assert(f:close())
 end
 
 
@@ -693,6 +710,37 @@ do
   assert(fr:read("all") == "xa\n")  -- now we have a whole line
   f:close(); fr:close()
   assert(os.remove(file))
+end
+
+
+if T and T.nonblock then
+  print("testing failed write")
+
+  -- unable to write anything to /dev/full
+  local f = io.open("/dev/full", "w")
+  assert(f:setvbuf("no"))
+  local _, _, err, count = f:write("abcd")
+  assert(err > 0 and count == 0)
+  assert(f:close())
+
+  -- receiver will read a "few" bytes (enough to empty a large buffer)
+  local receiver = [[
+    lua -e 'assert(io.stdin:setvbuf("no")); assert(#io.read(1e4) == 1e4)' ]]
+
+  local f = io.popen(receiver, "w")
+  assert(f:setvbuf("no"))
+  T.nonblock(f)
+
+  -- able to write a few bytes
+  assert(f:write(string.rep("a", 1e2)))
+
+  -- Unable to write more bytes than the pipe buffer supports.
+  -- (In Linux, the pipe buffer size is 64K (2^16). Posix requires at
+  -- least 512 bytes.)
+  local _, _, err, count = f:write("abcd", string.rep("a", 2^17))
+  assert(err > 0 and count >= 512 and count < 2^17)
+
+  assert(f:close())
 end
 
 

@@ -44,8 +44,8 @@
 #define LUA_RAND32
 
 
-/* test stack reallocation with strict address use */
-#define LUAI_STRICT_ADDRESS	1
+/* test stack reallocation without strict address use */
+#define LUAI_STRICT_ADDRESS	0
 
 
 /* memory-allocator control variables */
@@ -141,9 +141,6 @@ LUA_API void *debug_realloc (void *ud, void *block,
 
 #define STRCACHE_N	23
 #define STRCACHE_M	5
-
-#undef LUAI_USER_ALIGNMENT_T
-#define LUAI_USER_ALIGNMENT_T   union { char b[sizeof(void*) * 8]; }
 
 
 /*
