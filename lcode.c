@@ -40,7 +40,10 @@ static int codesJ (FuncState *fs, OpCode o, int sj, int k);
 
 
 /* semantic error */
-l_noret luaK_semerror (LexState *ls, const char *msg) {
+l_noret luaK_semerror (LexState *ls, const char *fmt, ...) {
+  const char *msg;
+  va_list argp;
+  pushvfstring(ls->L, argp, fmt, msg);
   ls->t.token = 0;  /* remove "near <token>" from final message */
   luaX_syntaxerror(ls, msg);
 }
