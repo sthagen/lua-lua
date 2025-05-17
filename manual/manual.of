@@ -213,11 +213,89 @@ of a given value @seeF{type}.
 
 }
 
-@sect2{globalenv| @title{Environments and the Global Environment}
+@sect2{globalenv| @title{Scopes, Variables, and Environments}
+@index{visibility}
+
+A variable name refers to a global or a local variable according
+to the declaration that is in context at that point of the code.
+(For the purposes of this discussion,
+a function's formal parameter is equivalent to a local variable.)
+
+All chunks start with an implicit declaration @T{global *},
+which declares all free names as global variables;
+this preambular declaration becomes void inside the scope of any other
+@Rw{global} declaration,
+as the following example illustrates:
+@verbatim{
+X = 1       -- Ok, global by default
+do
+  global Y  -- voids implicit initial declaration
+  Y = 1     -- Ok, Y declared as global
+  X = 1     -- ERROR, X not declared
+end
+X = 2       -- Ok, global by default again
+}
+So, outside any global declaration,
+Lua works as @x{global-by-default}.
+Inside any global declaration,
+Lua works without a default:
+All variables must be declared.
+
+Lua is a lexically scoped language.
+The scope of a variable declaration begins at the first statement after
+the declaration and lasts until the last non-void statement
+of the innermost block that includes the declaration.
+(@emph{Void statements} are labels and empty statements.)
+
+A declaration shadows any declaration for the same name that
+is in context at the point of the declaration. Inside this
+shadow, any outer declaration for that name is void.
+See the next example:
+@verbatim{
+global print, x
+x = 10                -- global variable
+do                    -- new block
+  local x = x         -- new 'x', with value 10
+  print(x)            --> 10
+  x = x+1
+  do                  -- another block
+    local x = x+1     -- another 'x'
+    print(x)          --> 12
+  end
+  print(x)            --> 11
+end
+print(x)              --> 10  (the global one)
+}
+
+Notice that, in a declaration like @T{local x = x},
+the new @id{x} being declared is not in scope yet,
+and so the @id{x} in the left-hand side refers to the outside variable.
+
+Because of the @x{lexical scoping} rules,
+local variables can be freely accessed by functions
+defined inside their scope.
+A local variable used by an inner function is called an @def{upvalue}
+(or @emphx{external local variable}, or simply @emphx{external variable})
+inside the inner function.
+
+Notice that each execution of a @Rw{local} statement
+defines new local variables.
+Consider the following example:
+@verbatim{
+a = {}
+local x = 20
+for i = 1, 10 do
+  local y = 0
+  a[i] = function () y = y + 1; return x + y end
+end
+}
+The loop creates ten closures
+(that is, ten instances of the anonymous function).
+Each of these closures uses a different @id{y} variable,
+while all of them share the same @id{x}.
 
 As we will discuss further in @refsec{variables} and @refsec{assignment},
-any reference to a free name
-(that is, a name not bound to any declaration) @id{var}
+any reference to a global variable @id{var}
 is syntactically translated to @T{_ENV.var}.
 Moreover, every chunk is compiled in the scope of
 an external local variable named @id{_ENV} @see{chunks},
@@ -225,12 +303,14 @@ so @id{_ENV} itself is never a free name in a chunk.
 
 Despite the existence of this external @id{_ENV} variable and
 the translation of free names,
-@id{_ENV} is a completely regular name.
+@id{_ENV} is a regular name.
 In particular,
 you can define new variables and parameters with that name.
-Each reference to a free name uses the @id{_ENV} that is
-visible at that point in the program,
-following the usual visibility rules of Lua @see{visibility}.
+(However, you should not define @id{_ENV} as a global variable,
+otherwise @T{_ENV.var} would translate to
+@T{_ENV._ENV.var} and so on, in an infinite loop.)
+Each reference to a global variable name uses the @id{_ENV} that is
+visible at that point in the program.
 
 Any table used as the value of @id{_ENV} is called an @def{environment}.
 
@@ -244,8 +324,8 @@ When Lua loads a chunk,
 the default value for its @id{_ENV} variable
 is the global environment @seeF{load}.
 Therefore, by default,
-free names in Lua code refer to entries in the global environment
-and, therefore, they are also called @def{global variables}.
+global variables in Lua code refer to entries in the global environment
+and, therefore, they act as conventional global variables.
 Moreover, all standard libraries are loaded in the global environment
 and some functions there operate on that environment.
 You can use @Lid{load} (or @Lid{loadfile})
@@ -1031,9 +1111,9 @@ and cannot be used as names:
 @index{reserved words}
 @verbatim{
 and       break     do        else      elseif    end
-false     for       function  goto      if        in
-local     nil       not       or        repeat    return
-then      true      until     while
+false     for       function  global    goto      if
+in        local     nil       not       or        repeat
+return    then      true      until     while
 }
 
 Lua is a case-sensitive language:
@@ -1198,17 +1278,15 @@ global variables, local variables, and table fields.
 
 A single name can denote a global variable or a local variable
 (or a function's formal parameter,
-which is a particular kind of local variable):
+which is a particular kind of local variable) @see{globalenv}:
 @Produc{
 @producname{var}@producbody{@bnfNter{Name}}
 }
 @bnfNter{Name} denotes identifiers @see{lexical}.
 
-Any variable name is assumed to be global unless explicitly declared
-as a local @see{localvar}.
-@x{Local variables} are @emph{lexically scoped}:
+Because variables are @emph{lexically scoped},
 local variables can be freely accessed by functions
-defined inside their scope @see{visibility}.
+defined inside their scope @see{globalenv}.
 
 Before the first assignment to a variable, its value is @nil.
 
@@ -1227,8 +1305,6 @@ The syntax @id{var.Name} is just syntactic sugar for
 
 An access to a global variable @id{x}
 is equivalent to @id{_ENV.x}.
-Due to the way that chunks are compiled,
-the variable @id{_ENV} itself is never global @see{globalenv}.
 
 }
 
@@ -1571,35 +1647,79 @@ Function calls are explained in @See{functioncall}.
 
 }
 
-@sect3{localvar| @title{Local Declarations}
-@x{Local variables} can be declared anywhere inside a block.
-The declaration can include an initialization:
+@sect3{localvar| @title{Variable Declarations}
+Local and global variables can be declared anywhere inside a block.
+The declaration for locals can include an initialization:
 @Produc{
 @producname{stat}@producbody{@Rw{local} attnamelist @bnfopt{@bnfter{=} explist}}
+@producname{stat}@producbody{@Rw{global} attnamelist}
 @producname{attnamelist}@producbody{
-  @bnfNter{Name} attrib @bnfrep{@bnfter{,} @bnfNter{Name} attrib}}
+  @bnfNter{Name} @bnfopt{attrib}
+     @bnfrep{@bnfter{,} @bnfNter{Name} @bnfopt{attrib}}}
 }
 If present, an initial assignment has the same semantics
 of a multiple assignment @see{assignment}.
-Otherwise, all variables are initialized with @nil.
+Otherwise, all local variables are initialized with @nil.
 
 Each variable name may be postfixed by an attribute
 (a name between angle brackets):
 @Produc{
-@producname{attrib}@producbody{@bnfopt{@bnfter{<} @bnfNter{Name} @bnfter{>}}}
+@producname{attrib}@producbody{@bnfter{<} @bnfNter{Name} @bnfter{>}}
 }
 There are two possible attributes:
 @id{const}, which declares a @emph{constant} or @emph{read-only} variable,
 @index{constant variable}
-that is, a variable that cannot be assigned to
-after its initialization;
+that is, a variable that cannot be used as the left-hand side of an
+assignment,
 and @id{close}, which declares a to-be-closed variable @see{to-be-closed}.
 A list of variables can contain at most one to-be-closed variable.
+Only local variables can have the @id{close} attribute.
+
+Lua offers also a collective declaration for global variables:
+@Produc{
+@producname{stat}@producbody{@Rw{global} @bnfter{*} @bnfopt{attrib}}
+}
+This special form implicitly declares
+as globals all names not explicitly declared previously.
+In particular,
+@T{global * <const>} implicitly declares
+as read-only globals all names not explicitly declared previously;
+see the following example:
+@verbatim{
+global X
+global * <const>
+print(math.pi)   -- Ok, 'print' and 'math' are read-only
+X = 1            -- Ok, declared as read-write
+Y = 1            -- Error, Y is read-only
+}
+
+As noted in @See{globalenv},
+all chunks start with an implicit declaration @T{global *},
+but this preambular declaration becomes void inside
+the scope of any other @Rw{global} declaration.
+Therefore, a program that does not use global declarations
+or start with @T{global *}
+has free read-write access to any global;
+a program that starts with @T{global * <const>}
+has free read-only access to any global;
+and a program that starts with any other global declaration
+(e.g., @T{global none}) can only refer to declared variables.
+
+Note that, for global variables,
+the effect of any declaration is only syntactical:
+@verbatim{
+global X <const>, _G
+X = 1           -- ERROR
+_ENV.X = 1      -- Ok
+_G.print(X)     -- Ok
+foo()         -- 'foo' can freely change any global
+}
 
 A chunk is also a block @see{chunks},
-and so local variables can be declared in a chunk outside any explicit block.
+and so variables can be declared in a chunk outside any explicit block.
 
-The visibility rules for local variables are explained in @See{visibility}.
+The visibility rules for variable declarations
+are explained in @See{globalenv}.
 
 }
 
@@ -2142,6 +2262,7 @@ The following syntactic sugar simplifies function definitions:
 @Produc{
 @producname{stat}@producbody{@Rw{function} funcname funcbody}
 @producname{stat}@producbody{@Rw{local} @Rw{function} @bnfNter{Name} funcbody}
+@producname{stat}@producbody{@Rw{global} @Rw{function} @bnfNter{Name} funcbody}
 @producname{funcname}@producbody{@bnfNter{Name} @bnfrep{@bnfter{.} @bnfNter{Name}} @bnfopt{@bnfter{:} @bnfNter{Name}}}
 }
 The statement
@@ -2160,6 +2281,7 @@ translates to
 @verbatim{
 t.a.b.c.f = function () @rep{body} end
 }
+
 The statement
 @verbatim{
 local function f () @rep{body} end
@@ -2173,7 +2295,15 @@ not to
 local f = function () @rep{body} end
 }
 (This only makes a difference when the body of the function
-contains references to @id{f}.)
+contains recursive references to @id{f}.)
+Similarly, the statement
+@verbatim{
+global function f () @rep{body} end
+}
+translates to
+@verbatim{
+global f; f = function () @rep{body} end
+}
 
 A function definition is an executable expression,
 whose value has type @emph{function}.
@@ -2236,7 +2366,7 @@ then the function returns with no results.
 @index{multiple return}
 There is a system-dependent limit on the number of values
 that a function may return.
-This limit is guaranteed to be greater than 1000.
+This limit is guaranteed to be at least 1000.
 
 The @emphx{colon} syntax
 is used to emulate @def{methods},
@@ -2356,58 +2486,6 @@ return x,y,f()     -- returns x, y, and all results from f().
 
 }
 
-@sect2{visibility| @title{Visibility Rules}
-
-@index{visibility}
-Lua is a lexically scoped language.
-The scope of a local variable begins at the first statement after
-its declaration and lasts until the last non-void statement
-of the innermost block that includes the declaration.
-(@emph{Void statements} are labels and empty statements.)
-Consider the following example:
-@verbatim{
-x = 10                -- global variable
-do                    -- new block
-  local x = x         -- new 'x', with value 10
-  print(x)            --> 10
-  x = x+1
-  do                  -- another block
-    local x = x+1     -- another 'x'
-    print(x)          --> 12
-  end
-  print(x)            --> 11
-end
-print(x)              --> 10  (the global one)
-}
-
-Notice that, in a declaration like @T{local x = x},
-the new @id{x} being declared is not in scope yet,
-and so the second @id{x} refers to the outside variable.
-
-Because of the @x{lexical scoping} rules,
-local variables can be freely accessed by functions
-defined inside their scope.
-A local variable used by an inner function is called an @def{upvalue}
-(or @emphx{external local variable}, or simply @emphx{external variable})
-inside the inner function.
-
-Notice that each execution of a @Rw{local} statement
-defines new local variables.
-Consider the following example:
-@verbatim{
-a = {}
-local x = 20
-for i = 1, 10 do
-  local y = 0
-  a[i] = function () y = y + 1; return x + y end
-end
-}
-The loop creates ten closures
-(that is, ten instances of the anonymous function).
-Each of these closures uses a different @id{y} variable,
-while all of them share the same @id{x}.
-
-}
 
 }
 
@@ -9408,7 +9486,12 @@ change between versions.
 @itemize{
 
 @item{
-The control variable in @Rw{for} loops are read only.
+The word @Rw{global} is a reserved word.
+Do not use it as a regular name.
+}
+
+@item{
+The control variable in @Rw{for} loops is read only.
 If you need to change it,
 declare a local variable with the same name in the loop body.
 }
@@ -9534,13 +9617,17 @@ and @bnfNter{LiteralString}, see @See{lexical}.)
 @OrNL   @Rw{for} namelist @Rw{in} explist @Rw{do} block @Rw{end}
 @OrNL	@Rw{function} funcname funcbody
 @OrNL	@Rw{local} @Rw{function} @bnfNter{Name} funcbody
+@OrNL	@Rw{global} @Rw{function} @bnfNter{Name} funcbody
 @OrNL	@Rw{local} attnamelist @bnfopt{@bnfter{=} explist}
+@OrNL	@Rw{global} attnamelist
+@OrNL	@Rw{global} @bnfter{*} @bnfopt{attrib}
 }
 
 @producname{attnamelist}@producbody{
-  @bnfNter{Name} attrib @bnfrep{@bnfter{,} @bnfNter{Name} attrib}}
+  @bnfNter{Name} @bnfopt{attrib}
+        @bnfrep{@bnfter{,} @bnfNter{Name} @bnfopt{attrib}}}
 
-@producname{attrib}@producbody{@bnfopt{@bnfter{<} @bnfNter{Name} @bnfter{>}}}
+@producname{attrib}@producbody{@bnfter{<} @bnfNter{Name} @bnfter{>}}
 
 @producname{retstat}@producbody{@Rw{return}
                                    @bnfopt{explist} @bnfopt{@bnfter{;}}}

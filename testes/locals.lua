@@ -1,6 +1,8 @@
 -- $Id: testes/locals.lua $
 -- See Copyright Notice in file lua.h
 
+global * <const>
+
 print('testing local variables and environments')
 
 local debug = require"debug"
@@ -39,9 +41,11 @@ f = nil
 local f
 local x = 1
 
-a = nil
-load('local a = {}')()
-assert(a == nil)
+do
+  global a; a = nil
+  load('local a = {}')()
+  assert(a == nil)
+end
 
 function f (a)
   local _1, _2, _3, _4, _5
@@ -154,7 +158,7 @@ local _ENV = (function (...) return ... end)(_G, dummy)   -- {
 do local _ENV = {assert=assert}; assert(true) end
 local mt = {_G = _G}
 local foo,x
-A = false    -- "declare" A
+global A; A = false    -- "declare" A
 do local _ENV = mt
   function foo (x)
     A = x
@@ -178,6 +182,8 @@ A = nil
 
 
 do   -- constants
+  global assert<const>, load, string, X
+  X = 1   -- not a constant
   local a<const>, b, c<const> = 10, 20, 30
   b = a + c + b    -- 'b' is not constant
   assert(a == 10 and b == 60 and c == 30)
@@ -191,6 +197,9 @@ do   -- constants
   checkro("z", "local x <const>, y, z <const> = 10, 20, 30; y = 10; z = 11")
   checkro("foo", "local foo <const> = 10; function foo() end")
   checkro("foo", "local foo <const> = {}; function foo() end")
+  checkro("foo", "global foo <const>; function foo() end")
+  checkro("XX", "global XX <const>; XX = 10")
+  checkro("XX", "local _ENV; global XX <const>; XX = 10")
 
   checkro("z", [[
     local a, z <const>, b = 10;
@@ -200,6 +209,11 @@ do   -- constants
   checkro("var1", [[
     local a, var1 <const> = 10;
     function foo() a = 20; z = function () var1 = 12; end  end
+  ]])
+
+  checkro("var1", [[
+    global a, var1 <const>, z;
+    local function foo() a = 20; z = function () var1 = 12; end  end
   ]])
 end
 
