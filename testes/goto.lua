@@ -1,9 +1,9 @@
 -- $Id: testes/goto.lua $
 -- See Copyright Notice in file lua.h
 
-global require
-global print, load, assert, string, setmetatable
-global collectgarbage, error
+global<const> require
+global<const> print, load, assert, string, setmetatable
+global<const> collectgarbage, error
 
 print("testing goto and global declarations")
 
@@ -23,15 +23,18 @@ errmsg([[ ::l1:: ::l1:: ]], "label 'l1'")
 errmsg([[ ::l1:: do ::l1:: end]], "label 'l1'")
 
 
--- undefined label
-errmsg([[ goto l1; local aa ::l1:: ::l2:: print(3) ]], "local 'aa'")
 
--- jumping over variable definition
+-- jumping over variable declaration
+errmsg([[ goto l1; local aa ::l1:: ::l2:: print(3) ]], "scope of 'aa'")
+
+errmsg([[ goto l2; global *; ::l1:: ::l2:: print(3) ]], "scope of '*'")
+
 errmsg([[
 do local bb, cc; goto l1; end
 local aa
 ::l1:: print(3)
-]], "local 'aa'")
+]], "scope of 'aa'")
+
 
 -- jumping into a block
 errmsg([[ do ::l1:: end goto l1 ]], "label 'l1'")
@@ -44,7 +47,7 @@ errmsg([[
     local xuxu = 10
     ::cont::
   until xuxu < x
-]], "local 'xuxu'")
+]], "scope of 'xuxu'")
 
 -- simple gotos
 local x
@@ -304,7 +307,7 @@ do
 
   -- global variables cannot be to-be-closed
   checkerr("global X<close>", "cannot be")
-  checkerr("global * <close>", "cannot be")
+  checkerr("global <close> *", "cannot be")
 
   do
     local X = 10
@@ -345,7 +348,7 @@ do
   end
 
   checkerr([[
-    global foo <const>;
+    global<const> foo;
     function foo (x) return end   -- ERROR: foo is read-only
   ]], "assign to const variable 'foo'")
 
@@ -357,11 +360,27 @@ do
   ]], "%:2%:")   -- correct line in error message
 
   checkerr([[
-    global * <const>;
+    global<const> *;
     print(X)    -- Ok to use
     Y = 1   -- ERROR
   ]], "assign to const variable 'Y'")
-  
+
+  checkerr([[
+    global *;
+    Y = X    -- Ok to use
+    global<const> *;
+    Y = 1   -- ERROR
+  ]], "assign to const variable 'Y'")
+
+  global *
+  Y = 10
+  assert(_ENV.Y == 10)
+  global<const> *
+  local x = Y
+  global *
+  Y = x + Y
+  assert(_ENV.Y == 20)
+
 end
 
 print'OK'
