@@ -127,7 +127,8 @@ strings can contain any 8-bit value,
 including @x{embedded zeros} (@Char{\0}).
 Lua is also encoding-agnostic;
 it makes no assumptions about the contents of a string.
-The length of any string in Lua must fit in a Lua integer.
+The length of any string in Lua must fit in a Lua integer,
+and the string plus a small header must fit in @id{size_t}.
 
 Lua can call (and manipulate) functions written in Lua and
 functions written in C @see{functioncall}.
@@ -269,7 +270,7 @@ print(x)              --> 10  (the global one)
 
 Notice that, in a declaration like @T{local x = x},
 the new @id{x} being declared is not in scope yet,
-and so the @id{x} in the right-hand side refers to the outside variable.
+and so the @id{x} on the right-hand side refers to the outside variable.
 
 Because of the @x{lexical scoping} rules,
 local variables can be freely accessed by functions
@@ -1555,7 +1556,8 @@ It has the following syntax:
   exp @bnfter{,} exp @bnfopt{@bnfter{,} exp} @Rw{do} block @Rw{end}}
 }
 The given identifier (@bnfNter{Name}) defines the control variable,
-which is a new read-only variable local to the loop body (@emph{block}).
+which is a new read-only (@id{const}) variable local to the loop body
+(@emph{block}).
 
 The loop starts by evaluating once the three control expressions.
 Their values are called respectively
@@ -1610,7 +1612,7 @@ works as follows.
 
 The names @rep{var_i} declare loop variables local to the loop body.
 The first of these variables is the @emph{control variable},
-which is a read-only variable.
+which is a read-only (@id{const}) variable.
 
 The loop starts by evaluating @rep{explist}
 to produce four values:
@@ -2824,7 +2826,16 @@ status codes to indicate different kinds of errors or other conditions:
 For such errors, Lua does not call the @x{message handler}.
 }
 
-@item{@defid{LUA_ERRERR}| error while running the @x{message handler}.}
+@item{@defid{LUA_ERRERR}|
+stack overflow while running the @x{message handler}
+due to another stack overflow.
+More often than not,
+this error is the result of some other error while running
+a message handler.
+An error in a message handler will call the handler again,
+which will generate the error again, and so on,
+until this loop exhausts the stack and cause this error.
+}
 
 @item{@defid{LUA_ERRSYNTAX}| syntax error during precompilation
 or format error in a binary chunk.}
@@ -4083,7 +4094,7 @@ Lua will call @id{falloc} before raising the error.
 
 
 @APIEntry{const char *lua_pushfstring (lua_State *L, const char *fmt, ...);|
-@apii{0,1,m}
+@apii{0,1,v}
 
 Pushes onto the stack a formatted string
 and returns a pointer to this string @see{constchar}.
@@ -4102,6 +4113,9 @@ A conversion specifier (and its corresponding extra argument) can be
 
 Every occurrence of @Char{%} in the string @id{fmt}
 must form a valid conversion specifier.
+
+Besides memory allocation errors,
+this function may raise an error if the resulting string is too large.
 
 }
 
@@ -4135,7 +4149,7 @@ light userdata with the same @N{C address}.
 }
 
 @APIEntry{const char *lua_pushliteral (lua_State *L, const char *s);|
-@apii{0,1,m}
+@apii{0,1,v}
 
 This macro is equivalent to @Lid{lua_pushstring},
 but should be used only when @id{s} is a literal string.
@@ -4144,7 +4158,7 @@ but should be used only when @id{s} is a literal string.
 }
 
 @APIEntry{const char *lua_pushlstring (lua_State *L, const char *s, size_t len);|
-@apii{0,1,m}
+@apii{0,1,v}
 
 Pushes the string pointed to by @id{s} with size @id{len}
 onto the stack.
@@ -4155,6 +4169,9 @@ The string can contain any binary data,
 including @x{embedded zeros}.
 
 Returns a pointer to the internal copy of the string @see{constchar}.
+
+Besides memory allocation errors,
+this function may raise an error if the string is too large.
 
 }
 
@@ -5015,8 +5032,8 @@ then @id{name} is set to @id{NULL}.
 @item{@id{namewhat}|
 explains the @T{name} field.
 The value of @T{namewhat} can be
-@T{"global"}, @T{"local"}, @T{"method"},
-@T{"field"}, @T{"upvalue"}, or @T{""} (the empty string),
+@T{"global"}, @T{"local"}, @T{"upvalue"},
+@T{"field"}, @T{""} (the empty string), plus some other options,
 according to how the function was called.
 (Lua uses the empty string when no other option seems to apply.)
 }
@@ -6571,7 +6588,7 @@ The call always returns the previous value of the parameter.
 If the call does not give a new value,
 the value is left unchanged.
 
-Lua rounds these values before storing them;
+Lua stores these values in a compressed format,
 so, the value returned as the previous value may not be
 exactly the last value set.
 }
@@ -6585,10 +6602,10 @@ This function should not be called by a finalizer.
 }
 
 @LibEntry{dofile ([filename])|
-Opens the named file and executes its content as a Lua chunk.
+Opens the named file and executes its content as a Lua chunk,
+returning all values returned by the chunk.
 When called without arguments,
 @id{dofile} executes the content of the standard input (@id{stdin}).
-Returns all values returned by the chunk.
 In case of errors, @id{dofile} propagates the error
 to its caller.
 (That is, @id{dofile} does not run in protected mode.)
@@ -6960,7 +6977,7 @@ in case of error
 (either the original error that stopped the coroutine or
 errors in closing methods),
 this function returns @false plus the error object;
-otherwise ir returns @true.
+otherwise it returns @true.
 
 }
 
@@ -8333,10 +8350,27 @@ that rounds the quotient towards zero. (integer/float)
 
 }
 
+@LibEntry{math.frexp (x)|
+
+Returns two numbers @id{m} and @id{e} such that @M{x = m2@sp{e}},
+where @id{e} is an integer.
+When @id{x} is zero, NaN, +inf, or -inf,
+@id{m} is equal to @id{x};
+otherwise, the absolute value of @id{m}
+is in the range @C{(} @M{[0.5, 1)} @C{]}.
+
+}
+
 @LibEntry{math.huge|
 
 The float value @idx{HUGE_VAL},
 a value greater than any other numeric value.
+
+}
+
+@LibEntry{math.ldexp(m, e)|
+
+Returns @M{m2@sp{e}}, where @id{e} is an integer.
 
 }
 
@@ -8395,7 +8429,7 @@ Converts the angle @id{x} from degrees to radians.
 
 When called without arguments,
 returns a pseudo-random float with uniform distribution
-in the range @C{(} @M{[0,1)}.  @C{]}
+in the range @C{(} @M{[0, 1)}.  @C{]}
 When called with two integers @id{m} and @id{n},
 @id{math.random} returns a pseudo-random integer
 with uniform distribution in the range @M{[m, n]}.
