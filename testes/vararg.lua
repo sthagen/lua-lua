@@ -3,9 +3,12 @@
 
 print('testing vararg')
 
-local function f (a, ...)
+local function f (a, ...|t)
   local x = {n = select('#', ...), ...}
-  for i = 1, x.n do assert(a[i] == x[i]) end
+  assert(x.n == t.n)
+  for i = 1, x.n do
+    assert(a[i] == x[i] and x[i] == t[i])
+  end
   return x.n
 end
 
@@ -17,7 +20,7 @@ local function c12 (...)
   return res, 2
 end
 
-local function vararg (...) return {n = select('#', ...), ...} end
+local function vararg (... | t) return t end
 
 local call = function (f, args) return f(table.unpack(args, 1, args.n)) end
 
@@ -99,7 +102,7 @@ assert(a==nil and b==nil and c==nil and d==nil and e==nil)
 
 
 -- varargs for main chunks
-local f = load[[ return {...} ]]
+local f = assert(load[[ return {...} ]])
 local x = f(2,3)
 assert(x[1] == 2 and x[2] == 3 and x[3] == undef)
 
@@ -147,5 +150,66 @@ do
   local a, b = g()
   assert(a == nil and b == 2)
 end
+
+
+do  -- vararg parameter used in nested functions
+  local function foo (... | tab1)
+    return function (... | tab2)
+      return {tab1, tab2}
+    end
+  end
+  local f = foo(10, 20, 30)
+  local t = f("a", "b")
+  assert(t[1].n == 3 and t[1][1] == 10)
+  assert(t[2].n == 2 and t[2][1] == "a")
+end
+
+do  -- vararg parameter is read-only
+  local st, msg = load("return function (... | t) t = 10 end")
+  assert(string.find(msg, "const variable 't'"))
+
+  local st, msg = load[[
+    local function foo (... | extra)
+      return function (...) extra = nil end
+    end
+  ]]
+  assert(string.find(msg, "const variable 'extra'"))
+end
+
+
+do  -- _ENV as vararg parameter
+  local st, msg = load[[
+    local function aux (... | _ENV)
+      global <const> a
+      a = 10
+    end ]]
+  assert(string.find(msg, "const variable 'a'"))
+end
+
+
+do   -- access to vararg parameter
+  local function notab (keys, t, ... | v)
+    for _, k in pairs(keys) do
+      assert(t[k] == v[k])
+    end
+    assert(t.n == v.n)
+  end
+
+  local t = table.pack(10, 20, 30)
+  local keys = {-1, 0, 1, t.n, t.n + 1, 1.0, 1.1, "n", print, "k", "1"}
+  notab(keys, t, 10, 20, 30)    -- ensure stack space
+  local m = collectgarbage"count"
+  notab(keys, t, 10, 20, 30)
+  -- 'notab' does not create any table/object
+  assert(m == collectgarbage"count")
+
+  -- writing to the vararg table
+  local function foo (... | t)
+    t[1] = t[1] + 10
+    return t[1]
+  end
+  assert(foo(10, 30) == 20)
+end
+
 print('OK')
 
