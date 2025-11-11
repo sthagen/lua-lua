@@ -126,13 +126,13 @@ testamem("coroutine creation", function()
 end)
 
 do  -- vararg tables
-  local function pack (... | t) return t end
+  local function pack (...t) return t end
   local b = testamem("vararg table", function ()
     return pack(10, 20, 30, 40, "hello")
   end)
   assert(b.aloc == 3)   -- new table uses three memory blocks
   -- table optimized away
-  local function sel (n, ...|arg) return arg[n] + arg.n end
+  local function sel (n, ...arg) return arg[n] + arg.n end
   local b = testamem("optimized vararg table",
         function () return sel(2.0, 20, 30) end)
   assert(b.res == 32 and b.aloc == 0)   -- no memory needed for this case
@@ -166,9 +166,9 @@ local function expand (n,s)
                               e, s, expand(n-1,s), e)
 end
 
-G=0; collectgarbage(); a =collectgarbage("count")
+G=0; collectgarbage()
 load(expand(20,"G=G+1"))()
-assert(G==20); collectgarbage();  -- assert(gcinfo() <= a+1)
+assert(G==20); collectgarbage()
 G = nil
 
 testamem("running code on new thread", function ()

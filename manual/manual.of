@@ -1660,9 +1660,15 @@ The declaration can include an initialization:
 @producname{stat}@producbody{@Rw{global}
   attnamelist @bnfopt{@bnfter{=} explist}}
 }
-If present, an initial assignment has the same semantics
+If there is no initialization,
+local variables are initialized with @nil;
+global variables are left unchanged.
+Otherwise, the initialization gets the same adjustment
 of a multiple assignment @see{assignment}.
-Otherwise, all local variables are initialized with @nil.
+Moreover, for global variables,
+the initialization will raise a runtime error
+if the variable is already defined,
+that is, it has a non-nil value.
 
 The list of names may be prefixed by an attribute
 (a name between angle brackets)
@@ -2312,8 +2318,10 @@ global function f () @rep{body} end
 }
 translates to
 @verbatim{
-global f; f = function () @rep{body} end
+global f; global f = function () @rep{body} end
 }
+The second @Rw{global} makes the assignment an initialization,
+which will raise an error if that global is already defined.
 
 The @emphx{colon} syntax
 is used to emulate @def{methods},
@@ -2354,8 +2362,7 @@ initialized with the argument values:
 @Produc{
 @producname{parlist}@producbody{namelist @bnfopt{@bnfter{,} varargparam} @Or
   varargparam}
-@producname{varargparam}@producbody{@bnfter{...}
-      @bnfopt{@bnfter{|} @bnfNter{Name}}}
+@producname{varargparam}@producbody{@bnfter{...} @bnfopt{@bnfNter{Name}}}
 }
 When a Lua function is called,
 it adjusts its list of @x{arguments} to
@@ -2396,7 +2403,7 @@ g(5, r())        a=5, b=1,   ... ->  2  3
 }
 
 The presence of a varag table in a variadic function is indicated
-by the @T{|name} syntax after the three dots.
+by a name after the three dots.
 When present,
 a vararg table behaves like a read-only local variable
 with the given name that is initialized with a table.
@@ -6792,11 +6799,11 @@ In particular, you may set existing fields to nil.
 @LibEntry{pairs (t)|
 
 If @id{t} has a metamethod @idx{__pairs},
-calls it with @id{t} as argument and returns the first three
+calls it with @id{t} as argument and returns the first four
 results from the call.
 
 Otherwise,
-returns three values: the @Lid{next} function, the table @id{t}, and @nil,
+returns the @Lid{next} function, the table @id{t}, plus two @nil values,
 so that the construction
 @verbatim{
 for k,v in pairs(t) do @rep{body} end
@@ -9773,8 +9780,7 @@ and @bnfNter{LiteralString}, see @See{lexical}.)
 @producname{parlist}@producbody{namelist @bnfopt{@bnfter{,} varargparam} @Or
   varargparam}
 
-@producname{varargparam}@producbody{@bnfter{...}
-      @bnfopt{@bnfter{|} @bnfNter{Name}}}
+@producname{varargparam}@producbody{@bnfter{...} @bnfopt{@bnfNter{Name}}}
 
 @producname{tableconstructor}@producbody{@bnfter{@Open} @bnfopt{fieldlist} @bnfter{@Close}}
 
