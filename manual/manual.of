@@ -2692,7 +2692,19 @@ which behaves like a nil value.
 
 @sect3{constchar|@title{Pointers to Strings}
 
-Several functions in the API return pointers (@T{const char*})
+Several functions in the API accept pointers (@T{const char*})
+to C strings.
+Some of there parameters have an associated length (@T{size_t}).
+Unless stated otherwise,
+when there is an associated length,
+the string can contain embedded zeros;
+moreover, the pointer can be @id{NULL} if the length is zero.
+When there is no associated length,
+the pointer must point to a zero-terminated string.
+In any case, the string contents should remain unchanged
+until the function returns.
+
+Several functions in the API also return pointers (@T{const char*})
 to Lua strings in the stack.
 (See @Lid{lua_pushfstring}, @Lid{lua_pushlstring},
 @Lid{lua_pushstring}, and @Lid{lua_tolstring}.
@@ -9594,12 +9606,18 @@ change between versions.
 @item{
 The word @Rw{global} is a reserved word.
 Do not use it as a regular name.
+
+The compilation option @id{LUA_COMPAT_GLOBAL} (see @id{luaconf.h})
+makes @id{global} a regular word.
 }
 
 @item{
 The control variable in @Rw{for} loops is read only.
 If you need to change it,
 declare a local variable with the same name in the loop body.
+
+The compilation option @id{LUA_COMPAT_LOOPVAR} (see @id{luaconf.h})
+makes these variables regular (writable).
 }
 
 @item{
