@@ -79,9 +79,7 @@
 #if defined(LUA_USE_MACOSX)
 #define LUA_USE_POSIX
 #define LUA_USE_DLOPEN		/* macOS does not need -ldl */
-#if !defined(LUA_READLINELIB)
-#define LUA_READLINELIB		"libedit.dylib"
-#endif
+#define LUA_USE_READLINE	/* needs an extra library: -lreadline */
 #endif
 
 
@@ -345,15 +343,6 @@
 */
 #if !defined(LUA_COMPAT_GLOBAL)
 #define LUA_COMPAT_GLOBAL	1
-#endif
-
-
-/*
-@@ LUA_COMPAT_LOOPVAR makes for-loop control variables not read-only,
-** as they were in previous versions.
-*/
-#if !defined(LUA_COMPAT_LOOPVAR)
-#define LUA_COMPAT_LOOPVAR	0
 #endif
 
 

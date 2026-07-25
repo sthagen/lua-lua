@@ -1614,7 +1614,6 @@ static void repeatstat (LexState *ls, int line) {
   statlist(ls);
   check_match(ls, TK_UNTIL, TK_REPEAT, line);
   condexit = cond(ls);  /* read condition (inside scope block) */
-  leaveblock(fs);  /* finish scope */
   if (bl2.upval) {  /* upvalues? */
     int exit = luaK_jump(fs);  /* normal exit must jump over fix */
     luaK_patchtohere(fs, condexit);  /* repetition must close upvalues */
@@ -1623,6 +1622,7 @@ static void repeatstat (LexState *ls, int line) {
     luaK_patchtohere(fs, exit);  /* normal exit comes to here */
   }
   luaK_patchlist(fs, condexit, repeat_init);  /* close the loop */
+  leaveblock(fs);  /* finish scope */
   leaveblock(fs);  /* finish loop */
 }
 
@@ -1685,22 +1685,13 @@ static void forbody (LexState *ls, int base, int line, int nvars, int isgen) {
 }
 
 
-/*
-** Control whether for-loop control variables are read-only
-*/
-#if LUA_COMPAT_LOOPVAR
-#define LOOPVARKIND	VDKREG
-#else  /* by default, these variables are read only */
-#define LOOPVARKIND	RDKCONST
-#endif
-
 static void fornum (LexState *ls, TString *varname, int line) {
   /* fornum -> NAME = exp,exp[,exp] forbody */
   FuncState *fs = ls->fs;
   int base = fs->freereg;
   new_localvarliteral(ls, "(for state)");
   new_localvarliteral(ls, "(for state)");
-  new_varkind(ls, varname, LOOPVARKIND);  /* control variable */
+  new_varkind(ls, varname, RDKCONST);  /* control variable */
   checknext(ls, '=');
   exp1(ls);  /* initial value */
   checknext(ls, ',');
@@ -1727,7 +1718,7 @@ static void forlist (LexState *ls, TString *indexname) {
   new_localvarliteral(ls, "(for state)");  /* iterator function */
   new_localvarliteral(ls, "(for state)");  /* state */
   new_localvarliteral(ls, "(for state)");  /* closing var. (after swap) */
-  new_varkind(ls, indexname, LOOPVARKIND);  /* control variable */
+  new_varkind(ls, indexname, RDKCONST);  /* control variable */
   /* other declared variables */
   while (testnext(ls, ',')) {
     new_localvar(ls, str_checkname(ls));
