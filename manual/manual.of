@@ -6071,8 +6071,8 @@ In both cases,
 the function pushes onto the stack the final value associated
 with @id{tname} in the registry.
 
-Usage note: Beware the use of the return value of this function to
-conditionally initializes the new metatable
+Usage note: Beware the use of the return value of this function
+to conditionally initialize the new metatable
 (e.g., by adding metamethods to it).
 If the initialization raises an error,
 the metatable will not be properly initialized,
